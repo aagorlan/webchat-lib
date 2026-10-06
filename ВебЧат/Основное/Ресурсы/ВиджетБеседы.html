@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+    html, body { height: 100%; margin: 0; }
+    body { font: 14px/1.4 -apple-system, "Segoe UI", Roboto, sans-serif; color: #1f2933; background: #eef4fb;
+        display: flex; flex-direction: column; }
+    #шапка { flex: none; display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: #fff;
+        border-bottom: 1px solid #c9d6e6; }
+    #аватар-беседы { width: 36px; height: 36px; border-radius: 50%; background: #c9d6e6 center / cover no-repeat;
+        flex: none; display: flex; align-items: center; justify-content: center; font-weight: 600; color: #fff; }
+    #название { flex: 1 1 auto; min-width: 0; font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden;
+        text-overflow: ellipsis; }
+    #кнопка-участники { border: 1px solid #c9d6e6; background: #f5f8fc; border-radius: 6px; height: 30px;
+        min-width: 36px; font-size: 16px; cursor: pointer; flex: none; }
+    #участники { position: fixed; top: 0; right: 0; bottom: 0; width: min(300px, 85%); background: #fff;
+        box-shadow: -2px 0 8px rgba(0,0,0,.15); display: none; flex-direction: column; z-index: 5; }
+    #участники.виден { display: flex; }
+    #участники .заголовок { display: flex; align-items: center; padding: 8px 10px; font-weight: 600;
+        border-bottom: 1px solid #c9d6e6; }
+    #участники .заголовок span { flex: 1 1 auto; }
+    #список-участников { flex: 1 1 auto; overflow-y: auto; padding: 4px 0; }
+    .участник { display: flex; align-items: center; gap: 8px; padding: 6px 10px; }
+    .участник .аватар { width: 30px; height: 30px; }
+    .участник .имя-участника { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .участник .отметка { font-size: 11px; color: #7b8794; flex: none; }
+    .участник .портрет { position: relative; flex: none; width: 30px; height: 30px; }
+    .участник .точка { position: absolute; right: -1px; bottom: -1px; width: 10px; height: 10px; border-radius: 50%;
+        background: #9aa5b1; border: 2px solid #fff; }
+    .участник.в-сети .точка { background: #2f9e44; }
+    #лента { flex: 1 1 auto; overflow-y: auto; padding: 8px 10px; }
+    .плашка { text-align: center; margin: 8px 0; }
+    .плашка span { display: inline-block; background: #fff; border: 1px solid #c9d6e6; border-radius: 10px;
+        padding: 2px 10px; font-size: 12px; color: #52606d; }
+    .новые span { border-color: #e8a33d; color: #8a5a12; }
+    .сообщение { display: flex; gap: 8px; margin: 6px 0; align-items: flex-end; }
+    .сообщение.свое { flex-direction: row-reverse; }
+    .аватар { width: 34px; height: 34px; border-radius: 50%; background: #c9d6e6; object-fit: cover; flex: none; }
+    .свое .аватар { display: none; }
+    .пузырь { max-width: 75%; background: #fff; border-radius: 12px; padding: 6px 10px; box-shadow: 0 1px 1px rgba(0,0,0,.08);
+        overflow-wrap: anywhere; }
+    .свое .пузырь { background: #d9f2d0; }
+    .автор { font-size: 12px; font-weight: 600; color: #2563a8; margin-bottom: 2px; }
+    .цитата { border-left: 3px solid #7aa7d9; padding: 2px 6px; margin-bottom: 4px; font-size: 12px; color: #52606d;
+        background: rgba(0,0,0,.03); border-radius: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .цитата[data-target] { cursor: pointer; }
+    .сообщение.подсветка .пузырь { box-shadow: 0 0 0 2px #e8a33d; background: #fff4e5; }
+    .пузырь { transition: background .4s, box-shadow .4s; }
+    .текст img { width: 22px; height: 22px; vertical-align: middle; }
+    .сообщение.служебное { justify-content: center; }
+    .служебное .событие { max-width: 85%; text-align: center; font-size: 12px; color: #52606d;
+        background: rgba(255,255,255,.7); border-radius: 10px; padding: 3px 10px; }
+    .служебное .событие .время { margin-left: 6px; }
+    .удалено { font-style: italic; color: #7b8794; }
+    .реакция.только-показ { cursor: default; }
+    /* Вложения — сетка шириной 200: по два в строке 100×150, при нечётном числе первое во всю ширину 200×150 */
+    .файлы { display: grid; grid-template-columns: 100px 100px; grid-auto-rows: 150px; width: 200px; margin: -2px 0 4px -2px; }
+    .файл { box-sizing: border-box; padding: 2px; min-width: 0; }
+    .файл.широкий { grid-column: span 2; }
+    .файл img { width: 100%; height: 100%; object-fit: cover; border-radius: 6px; cursor: pointer; display: block;
+        background: #e4ebf3; }
+    .карточка { width: 100%; height: 100%; box-sizing: border-box; border: 1px solid #c9d6e6; border-radius: 6px;
+        background: #f5f8fc; display: flex; flex-direction: column; align-items: center; justify-content: center;
+        gap: 6px; padding: 8px; cursor: pointer; text-decoration: none; color: #1f2933; }
+    .карточка .значок { font-size: 34px; line-height: 1; }
+    .карточка .расширение { font-size: 11px; font-weight: 600; color: #2563a8; text-transform: uppercase; }
+    .карточка .имя { font-size: 12px; text-align: center; width: 100%; overflow: hidden; display: -webkit-box;
+        -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+    .низ { display: flex; align-items: center; gap: 6px; margin-top: 4px; flex-wrap: wrap; }
+    .время { font-size: 11px; color: #7b8794; margin-left: auto; }
+    .реакция, .действие { border: 1px solid #c9d6e6; background: #f5f8fc; border-radius: 12px; padding: 1px 8px;
+        font-size: 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; line-height: 24px; }
+    .реакция.своя { border-color: #2563a8; background: #e3eefb; }
+    .реакция svg, .выбор svg { width: 18px; height: 18px; }
+    .действие { border: none; background: none; color: #52606d; padding: 1px 6px; font-size: 16px; min-width: 28px;
+        justify-content: center; border-radius: 6px; }
+    .действие:hover { background: #e3eefb; }
+    .выбор { display: inline-flex; gap: 4px; }
+    #ввод { flex: none; background: #fff; border-top: 1px solid #c9d6e6; padding: 6px 8px; }
+    #ответ, #вложения, #правка { font-size: 12px; color: #52606d; display: none; margin-bottom: 4px; }
+    #ответ.виден, #вложения.виден, #правка.виден { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+    .панель { display: flex; gap: 4px; align-items: center; margin-bottom: 4px; flex-wrap: wrap; }
+    .панель button { border: 1px solid #c9d6e6; background: #f5f8fc; border-radius: 6px; min-width: 32px; height: 30px;
+        font-size: 15px; cursor: pointer; }
+    #поле { min-height: 38px; max-height: 120px; overflow-y: auto; border: 1px solid #c9d6e6; border-radius: 8px;
+        padding: 6px 8px; outline: none; background: #fff; }
+    #поле:empty:before { content: attr(data-placeholder); color: #9aa5b1; }
+    #отправить { margin-left: auto; background: #2563a8; color: #fff; border: none; border-radius: 6px; padding: 0 14px; }
+    #отправить:disabled { background: #9aa5b1; }
+    .состояние { display: none; text-align: center; padding: 6px; font-size: 13px; }
+    .состояние.виден { display: block; }
+    #нет-связи { background: #fff4e5; color: #8a5a12; }
+    #закрыт { flex: 1 1 auto; display: none; align-items: center; justify-content: center; color: #52606d; }
+    #закрыт.виден { display: flex; }
+    #запрет { color: #8a5a12; font-size: 12px; display: none; }
+    #запрет.виден { display: block; }
+    #просмотр { position: fixed; inset: 0; background: rgba(0,0,0,.82); display: none; flex-direction: column;
+        align-items: center; justify-content: center; gap: 8px; z-index: 10; }
+    #просмотр.виден { display: flex; }
+    #просмотр img { max-width: 96%; max-height: calc(100% - 64px); object-fit: contain; border-radius: 4px; }
+    #просмотр .кнопки { display: flex; gap: 8px; }
+    #просмотр button { border: none; border-radius: 6px; padding: 6px 14px; font-size: 14px; cursor: pointer;
+        background: #fff; color: #1f2933; }
+</style>
+</head>
+<body>
+<div id="шапка" data-testid="шапка-чата">
+    <div id="аватар-беседы" data-testid="аватар-чата"></div>
+    <div id="название" data-testid="название-чата"></div>
+    <button type="button" id="кнопка-участники" title="Участники" aria-label="Участники" data-testid="участники">👥</button>
+</div>
+<div id="участники" data-testid="панель-участников">
+    <div class="заголовок"><span>Участники</span>
+        <button type="button" id="закрыть-участников" class="действие" title="Закрыть" aria-label="Закрыть"
+            data-testid="закрыть-участников">✕</button></div>
+    <div id="список-участников" data-testid="список-участников"></div>
+</div>
+<div id="нет-связи" class="состояние" data-testid="нет-связи">Нет связи, повторяем…</div>
+<div id="закрыт" data-testid="доступ-закрыт">Доступ к чату закрыт</div>
+<div id="лента" data-testid="переписка"></div>
+<div id="просмотр" data-testid="просмотр-изображения">
+    <img alt="">
+    <div class="кнопки">
+        <button type="button" id="просмотр-скачать" data-testid="скачать-изображение">Скачать</button>
+        <button type="button" id="просмотр-закрыть" data-testid="закрыть-просмотр">Закрыть</button>
+    </div>
+</div>
+<div id="ввод">
+    <div id="ответ" data-testid="ответ-на"></div>
+    <div id="правка" data-testid="правка"></div>
+    <div id="вложения" data-testid="вложения"></div>
+    <div id="запрет" data-testid="запрет">Вы можете только читать этот чат</div>
+    <div class="панель">
+        <button type="button" data-cmd="bold" title="Жирный"><b>Ж</b></button>
+        <button type="button" data-cmd="italic" title="Курсив"><i>К</i></button>
+        <button type="button" data-emoji="🙂" title="Улыбка">🙂</button>
+        <button type="button" data-emoji="👍" title="Палец вверх">👍</button>
+        <button type="button" data-emoji="👎" title="Палец вниз">👎</button>
+        <button type="button" data-emoji="🔥" title="Огонь">🔥</button>
+        <button type="button" data-emoji="🙏" title="Спасибо">🙏</button>
+        <button type="button" id="прикрепить" title="Приложить файл" data-testid="выбрать-файл">📎</button>
+        <input type="file" id="файл" multiple style="display:none" data-testid="файл">
+        <button type="button" id="отправить" title="Отправить (Ctrl+Enter)" data-testid="отправить">Отправить</button>
+    </div>
+    <div id="поле" contenteditable="true" data-placeholder="Сообщение" data-testid="поле-ввода"></div>
+</div>
+<script>
+(function () {
+    // Параметры подставляет Элемент строкой JSON (ПерепискаВебЧата.ПараметрыДляВиджета); ключ он же
+    // продлевает переменной window.chatKey. Адрес сервиса — от адреса страницы приложения:
+    // у встроенного блока тот же адрес, что у страницы
+    var параметры = @@ПАРАМЕТРЫ@@;
+    var беседа = параметры.Беседа;
+    window.chatKey = параметры.Ключ;
+    // Смена беседы пишет новую страницу в то же окно блока: таймеры прежней страницы живут
+    // дальше и опрашивали бы прежнюю беседу с ключом новой — 401 «другая беседа» закрывал
+    // новую переписку. Прежняя страница узнаёт, что устарела, и молчит
+    var экземпляр = {};
+    window.chatInstance = экземпляр;
+    function устарел() { return window.chatInstance !== экземпляр; }
+    var части = window.location.pathname.split('/');
+    var база = window.location.origin + '/' + части[1] + '/' + части[2] + '/api/webchat/' + беседа;
+
+    var ОПРОС_МС = 3000, ПАУЗА_МАКС_МС = 30000;
+    var РЕАКЦИИ = {
+        error: '<svg viewBox="0 0 24 24" fill="none" stroke="#c0392b" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 7v6M12 17h.01"/></svg>',
+        idea: '<svg viewBox="0 0 24 24" fill="none" stroke="#d4a017" stroke-width="2"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/></svg>',
+        like: '<svg viewBox="0 0 24 24" fill="none" stroke="#2563a8" stroke-width="2"><path d="M7 10v12M15 5.9 14 10h5.8a2 2 0 0 1 2 2.3l-1.4 8A2 2 0 0 1 18.4 22H7V10l4-8a3 3 0 0 1 4 3.9z"/></svg>'
+    };
+
+    var НАЗВАНИЯ_РЕАКЦИЙ = { error: 'Ошибка', idea: 'Идея', like: 'Нравится' };
+    var ТИПЫ_ИЗОБРАЖЕНИЙ = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif',
+        webp: 'image/webp', bmp: 'image/bmp', svg: 'image/svg+xml' };
+
+    var лента = document.getElementById('лента');
+    var поле = document.getElementById('поле');
+    var сообщения = {};       // Ид → данные
+    var элементы = {};        // Ид → DOM
+    var первый = 0, последний = 0, естьРаньше = false, закрыт = false;
+    var ответНа = null, правка = null, вложения = [], оставленные = [];
+    var аватары = {};
+    var я = '';
+
+    // ── обмен с сервисом ────────────────────────────────────────────────────
+    function запрос(метод, путь, тело, тип) {
+        if (устарел()) return Promise.reject(new Error('устарел'));
+        var заголовки = { 'Authorization': 'Bearer ' + window.chatKey };
+        var данные = тело;
+        if (тело !== undefined && !(тело instanceof Blob)) {
+            заголовки['Content-Type'] = 'application/json; charset=utf-8';
+            данные = JSON.stringify(тело);
+        } else if (тело instanceof Blob) {
+            заголовки['Content-Type'] = тип || 'application/octet-stream';
+        }
+        return fetch(база + путь, { method: метод, headers: заголовки, body: данные, cache: 'no-store' })
+            .then(function (ответ) {
+                if (устарел()) throw new Error('устарел');
+                if (ответ.status === 401) { закрыть(); throw new Error('закрыт'); }
+                if (ответ.status >= 500) { throw new Error('сервер ' + ответ.status); }
+                связь(true);
+                return ответ;
+            }, function (ошибка) { if (!устарел()) связь(false); throw ошибка; });
+    }
+    function json(ответ) { return ответ.status === 204 ? null : ответ.json(); }
+
+    function связь(есть) {
+        document.getElementById('нет-связи').classList.toggle('виден', !есть);
+    }
+    function закрыть() {
+        if (устарел()) return;
+        закрыт = true;
+        лента.style.display = 'none';
+        document.getElementById('ввод').style.display = 'none';
+        document.getElementById('закрыт').classList.add('виден');
+    }
+
+    // ── разметка: только разрешённое ───────────────────────────────────────
+    var РАЗРЕШЕНО = { B: 1, I: 1, STRONG: 1, EM: 1, BR: 1, DIV: 1, P: 1, SPAN: 1 };
+    function очистить(html) {
+        var шаблон = document.createElement('template');
+        шаблон.innerHTML = html || '';
+        (function обойти(узел) {
+            Array.prototype.slice.call(узел.childNodes).forEach(function (дочерний) {
+                if (дочерний.nodeType === 3) return;
+                if (дочерний.nodeType !== 1) { дочерний.remove(); return; }
+                var имя = дочерний.tagName;
+                if (имя === 'IMG') {
+                    var src = дочерний.getAttribute('src') || '';
+                    if (!/^data:image\/(png|gif|jpeg);base64,/i.test(src)) { дочерний.remove(); return; }
+                    var alt = дочерний.getAttribute('alt') || '';
+                    while (дочерний.attributes.length) дочерний.removeAttribute(дочерний.attributes[0].name);
+                    дочерний.setAttribute('src', src);
+                    дочерний.setAttribute('alt', alt);
+                    return;
+                }
+                if (!РАЗРЕШЕНО[имя]) {
+                    обойти(дочерний);
+                    while (дочерний.firstChild) узел.insertBefore(дочерний.firstChild, дочерний);
+                    дочерний.remove();
+                    return;
+                }
+                while (дочерний.attributes.length) дочерний.removeAttribute(дочерний.attributes[0].name);
+                обойти(дочерний);
+            });
+        })(шаблон.content);
+        return шаблон.content;
+    }
+
+    function blobАдрес(путь, готово) {
+        запрос('GET', путь).then(function (ответ) {
+            if (ответ.status !== 200) return;
+            return ответ.blob().then(function (b) { готово(URL.createObjectURL(b)); });
+        }).catch(function () {});
+    }
+
+    // ── вывод ───────────────────────────────────────────────────────────────
+    function плашка(текст, класс, testid) {
+        var div = document.createElement('div');
+        div.className = 'плашка ' + (класс || '');
+        if (testid) div.setAttribute('data-testid', testid);
+        var span = document.createElement('span');
+        span.textContent = текст;
+        div.appendChild(span);
+        return div;
+    }
+
+    // Служебное сообщение — событие группы («… покинул(а) чат»): без автора и без действий
+    function элементСобытия(д) {
+        var корень = document.createElement('div');
+        корень.className = 'сообщение служебное';
+        корень.setAttribute('data-testid', 'служебное-сообщение');
+        корень.setAttribute('data-id', д.Ид);
+        корень.setAttribute('data-day', д.День);
+        var событие = document.createElement('div');
+        событие.className = 'событие';
+        var текст = document.createElement('span');
+        текст.className = 'текст';
+        текст.setAttribute('data-testid', 'текст-события');
+        текст.appendChild(очистить(д.Текст));
+        событие.appendChild(текст);
+        var время = document.createElement('span');
+        время.className = 'время';
+        время.textContent = д.Время;
+        событие.appendChild(время);
+        корень.appendChild(событие);
+        return корень;
+    }
+
+    function элементСообщения(д) {
+        if (д.Служебное) return элементСобытия(д);
+        var корень = document.createElement('div');
+        корень.className = 'сообщение' + (д.Свое ? ' свое' : '');
+        корень.setAttribute('data-testid', 'сообщение');
+        корень.setAttribute('data-id', д.Ид);
+        корень.setAttribute('data-day', д.День);
+
+        var аватар = document.createElement('img');
+        аватар.className = 'аватар';
+        аватар.alt = '';
+        if (!д.Свое && д.Автор) {
+            if (аватары[д.Автор]) аватар.src = аватары[д.Автор];
+            else blobАдрес('/avatars/' + д.Автор, function (адрес) { аватары[д.Автор] = адрес; аватар.src = адрес; });
+        }
+        корень.appendChild(аватар);
+
+        var пузырь = document.createElement('div');
+        пузырь.className = 'пузырь';
+        if (!д.Свое) {
+            var автор = document.createElement('div');
+            автор.className = 'автор';
+            автор.textContent = д.АвторИмя;
+            пузырь.appendChild(автор);
+        }
+        if (д.ОтветИд || д.ОтветУдален) {
+            var цитата = document.createElement('div');
+            цитата.className = 'цитата';
+            цитата.setAttribute('data-testid', 'цитата');
+            цитата.textContent = д.ОтветУдален ? 'Сообщение удалено'
+                : д.ОтветУдаленАдминистратором ? 'Удалено администратором'
+                : (д.ОтветАвтор + ': ' + д.ОтветТекст);
+            if (!д.ОтветУдален && д.ОтветИд) {
+                цитата.setAttribute('data-target', д.ОтветИд);
+                цитата.title = 'Перейти к сообщению';
+                цитата.onclick = function () { перейтиК(д.ОтветИд, 0); };
+            }
+            пузырь.appendChild(цитата);
+        }
+        var текст = document.createElement('div');
+        текст.className = 'текст';
+        текст.setAttribute('data-testid', 'текст-сообщения');
+        if (д.УдаленоАдминистратором) {
+            текст.classList.add('удалено');
+            текст.setAttribute('data-testid', 'удалено-администратором');
+            текст.textContent = 'Удалено администратором';
+        } else {
+            текст.appendChild(очистить(д.Текст));
+        }
+        пузырь.appendChild(текст);
+
+        if (д.Файлы && д.Файлы.length) {
+            var файлы = document.createElement('div');
+            файлы.className = 'файлы';
+            д.Файлы.forEach(function (ф, номер) {
+                var путь = '/messages/' + д.Ид + '/files/' + ф.Номер;
+                var ячейка = document.createElement('div');
+                ячейка.className = 'файл' + (номер === 0 && д.Файлы.length % 2 === 1 ? ' широкий' : '');
+                if (ф.ЭтоИзображение) {
+                    var img = document.createElement('img');
+                    img.alt = ф.Имя;
+                    img.setAttribute('data-testid', 'вложение');
+                    blobАдрес(путь + '?preview=1', function (адрес) { img.src = адрес; });
+                    img.title = ф.Имя;
+                    img.onclick = function () { показатьИзображение(путь, ф.Имя); };
+                    ячейка.appendChild(img);
+                } else {
+                    var карточка = document.createElement('a');
+                    карточка.href = '#';
+                    карточка.className = 'карточка';
+                    карточка.title = 'Скачать ' + ф.Имя;
+                    карточка.setAttribute('data-testid', 'вложение');
+                    var значок = document.createElement('span');
+                    значок.className = 'значок';
+                    значок.textContent = '📄';
+                    var точка = ф.Имя.lastIndexOf('.');
+                    var расширение = document.createElement('span');
+                    расширение.className = 'расширение';
+                    расширение.textContent = точка > 0 ? ф.Имя.slice(точка + 1) : 'файл';
+                    var имя = document.createElement('span');
+                    имя.className = 'имя';
+                    имя.textContent = ф.Имя;
+                    карточка.appendChild(значок);
+                    карточка.appendChild(расширение);
+                    карточка.appendChild(имя);
+                    карточка.onclick = function (e) { e.preventDefault(); скачать(путь, ф.Имя); };
+                    ячейка.appendChild(карточка);
+                }
+                файлы.appendChild(ячейка);
+            });
+            пузырь.insertBefore(файлы, текст);
+        }
+
+        var низ = document.createElement('div');
+        низ.className = 'низ';
+        (д.Реакции || []).forEach(function (р) {
+            var кнопка = document.createElement('span');
+            кнопка.className = 'реакция' + (р.Своя ? ' своя' : '') + (д.МожноРеагировать ? '' : ' только-показ');
+            кнопка.setAttribute('data-testid', 'реакция');
+            кнопка.setAttribute('data-code', р.Код);
+            кнопка.title = (НАЗВАНИЯ_РЕАКЦИЙ[р.Код] || р.Код)
+                + (р.Своя && д.МожноРеагировать ? ' — нажмите, чтобы снять' : '');
+            кнопка.innerHTML = (РЕАКЦИИ[р.Код] || '') + '<span>' + р.Количество + '</span>';
+            if (д.МожноРеагировать) кнопка.onclick = function () { реакция(д.Ид, р.Код); };
+            низ.appendChild(кнопка);
+        });
+        // Кнопки — по правам, которые сервер посчитал для этого сообщения и этого собеседника
+        if (д.МожноРеагировать) {
+            низ.appendChild(действие('☺+', 'Поставить реакцию', 'выбрать-реакцию', function (кнопка) { выборРеакции(кнопка, д.Ид); }));
+        }
+        if (д.МожноОтветить) низ.appendChild(действие('↩', 'Ответить', 'ответить', function () { ответить(д); }));
+        if (д.МожноИзменить) низ.appendChild(действие('✎', 'Изменить', 'изменить', function () { изменить(д); }));
+        if (д.МожноУдалить) {
+            низ.appendChild(действие('✕', д.Свое ? 'Удалить' : 'Удалить как администратор', 'удалить',
+                function () { удалить(д); }));
+        }
+        var время = document.createElement('span');
+        время.className = 'время';
+        время.textContent = д.Время;
+        низ.appendChild(время);
+        пузырь.appendChild(низ);
+        корень.appendChild(пузырь);
+        return корень;
+    }
+
+    function действие(значок, подсказка, testid, обработчик) {
+        var кнопка = document.createElement('button');
+        кнопка.type = 'button';
+        кнопка.className = 'действие';
+        кнопка.textContent = значок;
+        кнопка.title = подсказка;
+        кнопка.setAttribute('aria-label', подсказка);
+        кнопка.setAttribute('data-testid', testid);
+        кнопка.onclick = function () { обработчик(кнопка); };
+        return кнопка;
+    }
+
+    function внизу() { return лента.scrollHeight - лента.scrollTop - лента.clientHeight < 60; }
+    function прокрутитьВниз() { лента.scrollTop = лента.scrollHeight; }
+
+    function запомнить(д) {
+        сообщения[д.Ид] = д;
+        if (!первый || д.Номер < первый) первый = д.Номер;
+        if (д.Номер > последний) последний = д.Номер;
+    }
+
+    // Плашки дней пересобираются целиком: сообщения приходят и сверху, и снизу
+    function разложитьДни() {
+        Array.prototype.slice.call(лента.querySelectorAll('.день')).forEach(function (п) { п.remove(); });
+        var прежний = null;
+        Array.prototype.slice.call(лента.querySelectorAll('.сообщение')).forEach(function (элемент) {
+            var день = элемент.getAttribute('data-day');
+            if (день !== прежний) {
+                лента.insertBefore(плашка(день, 'день'), элемент);
+                прежний = день;
+            }
+        });
+    }
+
+    function добавитьВКонец(список) {
+        список.forEach(function (д) {
+            if (элементы[д.Ид]) return;
+            запомнить(д);
+            var элемент = элементСообщения(д);
+            элементы[д.Ид] = элемент;
+            лента.appendChild(элемент);
+        });
+    }
+
+    function заменить(д) {
+        var старый = элементы[д.Ид];
+        if (!старый) return;
+        запомнить(д);
+        var новый = элементСообщения(д);
+        старый.replaceWith(новый);
+        элементы[д.Ид] = новый;
+    }
+
+    function убрать(ид) {
+        if (элементы[ид]) элементы[ид].remove();
+        delete элементы[ид];
+        delete сообщения[ид];
+    }
+
+    function кнопкаРаньше() {
+        var старая = document.getElementById('раньше');
+        if (старая) старая.remove();
+        if (!естьРаньше) return;
+        var кнопка = document.createElement('div');
+        кнопка.className = 'плашка';
+        кнопка.id = 'раньше';
+        кнопка.innerHTML = '<span style="cursor:pointer">Загрузить предыдущие</span>';
+        кнопка.setAttribute('data-testid', 'загрузить-предыдущие');
+        кнопка.onclick = загрузитьРаньше;
+        лента.insertBefore(кнопка, лента.firstChild);
+    }
+
+    // ── сценарии ────────────────────────────────────────────────────────────
+    function начать() {
+        запрос('GET', '/messages').then(json).then(function (порция) {
+            добавитьВКонец(порция.Сообщения);
+            естьРаньше = порция.ЕстьРаньше;
+            if (порция.ПервоеНепрочитанное && элементы[ид(порция.ПервоеНепрочитанное)]) {
+                лента.insertBefore(плашка('Новые сообщения', 'новые', 'новые-сообщения'),
+                    элементы[ид(порция.ПервоеНепрочитанное)]);
+            }
+            разложитьДни();
+            кнопкаРаньше();
+            прокрутитьВниз();
+            разрешитьВвод(порция.МожноПисать);
+            я = порция.Я;
+            setTimeout(опрос, ОПРОС_МС);
+        }).catch(function () { if (!закрыт && !устарел()) setTimeout(начать, ОПРОС_МС); });
+    }
+
+    function ид(номер) {
+        for (var к in сообщения) if (сообщения[к].Номер === номер) return к;
+        return null;
+    }
+
+    function загрузитьРаньше() {
+        var высота = лента.scrollHeight;
+        return запрос('GET', '/messages?before=' + первый).then(json).then(function (порция) {
+            var опора = document.getElementById('раньше') ? document.getElementById('раньше').nextSibling : лента.firstChild;
+            порция.Сообщения.forEach(function (д) {
+                if (элементы[д.Ид]) return;
+                запомнить(д);
+                var элемент = элементСообщения(д);
+                элементы[д.Ид] = элемент;
+                лента.insertBefore(элемент, опора);
+            });
+            естьРаньше = порция.ЕстьРаньше;
+            разложитьДни();
+            кнопкаРаньше();
+            лента.scrollTop = лента.scrollHeight - высота;
+        }).catch(function () {});
+    }
+
+    // Исходное сообщение ответа может быть старше загруженных — догружаются порции до него
+    function перейтиК(идСообщения, порций) {
+        var элемент = элементы[идСообщения];
+        if (элемент) {
+            элемент.scrollIntoView({ block: 'center', behavior: 'smooth' });
+            элемент.classList.add('подсветка');
+            setTimeout(function () { элемент.classList.remove('подсветка'); }, 2000);
+            return;
+        }
+        if (!естьРаньше || порций >= 50) return;
+        загрузитьРаньше().then(function () { перейтиК(идСообщения, порций + 1); });
+    }
+
+    // Одна сверка с сервером; опрос повторяет её, действие (удаление администратором) — вызывает сразу
+    function сверить() {
+        var известные = Object.keys(сообщения).map(function (к) { return { Ид: к, Версия: сообщения[к].Версия }; });
+        return запрос('POST', '/sync', { Последний: последний, Известные: известные }).then(json).then(function (и) {
+            var былВнизу = внизу();
+            (и.Удаленные || []).forEach(убрать);
+            (и.Измененные || []).forEach(заменить);
+            if (и.Новые && и.Новые.length) добавитьВКонец(и.Новые);
+            if ((и.Удаленные && и.Удаленные.length) || (и.Новые && и.Новые.length)) разложитьДни();
+            if (былВнизу) прокрутитьВниз();
+        });
+    }
+
+    var пауза = ОПРОС_МС;
+    function опрос() {
+        if (закрыт || устарел()) return;
+        сверить().then(function () {
+            пауза = ОПРОС_МС;
+            setTimeout(опрос, пауза);
+        }).catch(function () {
+            if (закрыт || устарел()) return;
+            пауза = Math.min(пауза * 2, ПАУЗА_МАКС_МС);
+            setTimeout(опрос, пауза);
+        });
+    }
+
+    // Только читающему (приглашённый, без согласия на публикацию) поле и панель не показываются
+    function разрешитьВвод(можно) {
+        document.getElementById('запрет').classList.toggle('виден', !можно);
+        document.querySelector('#ввод .панель').style.display = можно ? '' : 'none';
+        поле.style.display = можно ? '' : 'none';
+        поле.setAttribute('contenteditable', можно ? 'true' : 'false');
+        document.getElementById('отправить').disabled = !можно;
+        document.getElementById('прикрепить').disabled = !можно;
+    }
+
+    function отправить() {
+        var html = поле.innerHTML.trim();
+        var текст = поле.innerText.trim();
+        if (!текст && !вложения.length && !оставленные.length && html.indexOf('<img') < 0) return;
+        var черновик = { Текст: html, ТекстБезРазметки: текст, Ответ: ответНа ? ответНа.Ид : '',
+            Вложения: вложения.map(function (в) { return в.Ид; }),
+            Оставить: оставленные.map(function (ф) { return ф.Номер; }) };
+        var кнопка = document.getElementById('отправить');
+        кнопка.disabled = true;
+        var действиеЗапроса = правка
+            ? запрос('PUT', '/messages/' + правка.Ид, черновик)
+            : запрос('POST', '/messages', черновик);
+        действиеЗапроса.then(function (ответ) {
+            if (ответ.status === 403) { разрешитьВвод(false); return null; }
+            return json(ответ);
+        }).then(function (д) {
+            кнопка.disabled = false;
+            if (!д) return;
+            if (правка) заменить(д); else { добавитьВКонец([д]); разложитьДни(); прокрутитьВниз(); }
+            поле.innerHTML = '';
+            сброситьОтвет(); сброситьПравку(); вложения = []; показатьВложения();
+        }).catch(function () { кнопка.disabled = false; });
+    }
+
+    function ответить(д) {
+        сброситьПравку();
+        ответНа = д;
+        var блок = document.getElementById('ответ');
+        блок.textContent = 'Ответ на: ' + (д.Свое ? 'ваше сообщение' : д.АвторИмя) + ' — ' + (элементы[д.Ид].querySelector('.текст').innerText.slice(0, 50));
+        блок.appendChild(действие('✕', 'Не отвечать', 'отменить-ответ', сброситьОтвет));
+        блок.classList.add('виден');
+        поле.focus();
+    }
+    function сброситьОтвет() { ответНа = null; var б = document.getElementById('ответ'); б.textContent = ''; б.classList.remove('виден'); }
+
+    function изменить(д) {
+        сброситьОтвет();
+        правка = д;
+        поле.innerHTML = '';
+        поле.appendChild(очистить(д.Текст));
+        var блок = document.getElementById('правка');
+        блок.textContent = 'Изменение сообщения';
+        блок.appendChild(действие('✕', 'Отменить изменение', 'отменить-правку', function () {
+            сброситьПравку(); поле.innerHTML = ''; вложения = []; показатьВложения();
+        }));
+        блок.classList.add('виден');
+        оставленные = (д.Файлы || []).slice();
+        показатьВложения();
+        поле.focus();
+    }
+    function сброситьПравку() {
+        правка = null;
+        оставленные = [];
+        var б = document.getElementById('правка');
+        б.textContent = '';
+        б.classList.remove('виден');
+        показатьВложения();
+    }
+
+    // Своё сообщение пропадает из ленты; чужое, удалённое администратором, остаётся с пометкой —
+    // его новый вид приносит сверка
+    function удалить(д) {
+        if (!window.confirm(д.Свое ? 'Удалить сообщение?'
+            : 'Удалить сообщение участника? В ленте останется отметка «Удалено администратором».')) return;
+        запрос('DELETE', '/messages/' + д.Ид).then(function (ответ) {
+            if (ответ.status !== 204) return;
+            if (д.Свое) { убрать(д.Ид); разложитьДни(); } else return сверить();
+        }).catch(function () {});
+    }
+
+    function реакция(идСообщения, код) {
+        запрос('POST', '/messages/' + идСообщения + '/reaction', { Реакция: код }).then(json).then(function (д) {
+            if (д) заменить(д);
+        }).catch(function () {});
+    }
+
+    function выборРеакции(кнопка, идСообщения) {
+        var выбор = document.createElement('span');
+        выбор.className = 'выбор';
+        выбор.setAttribute('data-testid', 'набор-реакций');
+        Object.keys(РЕАКЦИИ).forEach(function (код) {
+            var вариант = document.createElement('span');
+            вариант.className = 'реакция';
+            вариант.setAttribute('data-code', код);
+            вариант.title = НАЗВАНИЯ_РЕАКЦИЙ[код];
+            вариант.innerHTML = РЕАКЦИИ[код];
+            вариант.onclick = function () { выбор.remove(); реакция(идСообщения, код); };
+            выбор.appendChild(вариант);
+        });
+        кнопка.replaceWith(выбор);
+    }
+
+    function скачать(путь, имя) {
+        запрос('GET', путь).then(function (ответ) { return ответ.blob(); }).then(function (b) {
+            сохранить(URL.createObjectURL(b), имя);
+        }).catch(function () {});
+    }
+
+    function сохранить(адрес, имя) {
+        var ссылка = document.createElement('a');
+        ссылка.href = адрес;
+        ссылка.download = имя;
+        document.body.appendChild(ссылка);
+        ссылка.click();
+        ссылка.remove();
+    }
+
+    // Изображение открывается поверх переписки, а не в новой вкладке: сервис не сообщает тип
+    // файла, и браузер показал бы его как текст; тип берётся по расширению
+    var просмотр = document.getElementById('просмотр');
+    var просмотрКартинка = просмотр.querySelector('img');
+    var просмотрАдрес = null;
+    var просмотрИмя = '';
+
+    function показатьИзображение(путь, имя) {
+        запрос('GET', путь).then(function (ответ) { return ответ.blob(); }).then(function (b) {
+            var расширение = (имя.split('.').pop() || '').toLowerCase();
+            var тип = ТИПЫ_ИЗОБРАЖЕНИЙ[расширение] || b.type || 'image/png';
+            закрытьИзображение();
+            просмотрАдрес = URL.createObjectURL(new Blob([b], { type: тип }));
+            просмотрИмя = имя;
+            просмотрКартинка.src = просмотрАдрес;
+            просмотрКартинка.alt = имя;
+            просмотр.classList.add('виден');
+        }).catch(function () {});
+    }
+
+    function закрытьИзображение() {
+        просмотр.classList.remove('виден');
+        просмотрКартинка.removeAttribute('src');
+        if (просмотрАдрес) URL.revokeObjectURL(просмотрАдрес);
+        просмотрАдрес = null;
+    }
+
+    просмотр.onclick = function (e) { if (e.target === просмотр) закрытьИзображение(); };
+    document.getElementById('просмотр-закрыть').onclick = закрытьИзображение;
+    document.getElementById('просмотр-скачать').onclick = function () {
+        if (просмотрАдрес) сохранить(просмотрАдрес, просмотрИмя);
+    };
+    document.addEventListener('keydown', function (e) {
+        if (e.key !== 'Escape') return;
+        закрытьИзображение();
+        скрытьУчастников();
+    });
+
+    function чипФайла(имя, убрать) {
+        var чип = document.createElement('span');
+        чип.setAttribute('data-testid', 'файл-черновика');
+        чип.textContent = '📄 ' + имя;
+        var кнопка = действие('✕', 'Убрать файл', 'убрать-вложение', убрать);
+        кнопка.addEventListener('mousedown', function (e) { e.preventDefault(); });
+        чип.appendChild(кнопка);
+        return чип;
+    }
+
+    function показатьВложения() {
+        var блок = document.getElementById('вложения');
+        блок.textContent = '';
+        // У изменяемого сообщения его файлы показываются вместе с новыми: убрать можно любой
+        оставленные.forEach(function (ф, номер) {
+            блок.appendChild(чипФайла(ф.Имя, function () { оставленные.splice(номер, 1); показатьВложения(); }));
+        });
+        вложения.forEach(function (в, номер) {
+            блок.appendChild(чипФайла(в.Имя, function () { вложения.splice(номер, 1); показатьВложения(); }));
+        });
+        блок.classList.toggle('виден', оставленные.length + вложения.length > 0);
+    }
+
+    // ── ввод ────────────────────────────────────────────────────────────────
+    document.querySelectorAll('[data-cmd]').forEach(function (кнопка) {
+        кнопка.addEventListener('mousedown', function (e) { e.preventDefault(); });
+        кнопка.onclick = function () { document.execCommand(кнопка.getAttribute('data-cmd'), false, null); поле.focus(); };
+    });
+    document.querySelectorAll('[data-emoji]').forEach(function (кнопка) {
+        кнопка.addEventListener('mousedown', function (e) { e.preventDefault(); });
+        кнопка.onclick = function () { поле.focus(); document.execCommand('insertText', false, кнопка.getAttribute('data-emoji')); };
+    });
+    document.getElementById('отправить').onclick = отправить;
+    поле.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); отправить(); }
+    });
+    document.getElementById('прикрепить').onclick = function () { document.getElementById('файл').click(); };
+    document.getElementById('файл').onchange = function (e) {
+        Array.prototype.slice.call(e.target.files).forEach(function (файл) {
+            запрос('POST', '/uploads?name=' + encodeURIComponent(файл.name), файл, файл.type).then(json).then(function (в) {
+                if (в) { вложения.push(в); показатьВложения(); }
+            }).catch(function () {});
+        });
+        e.target.value = '';
+    };
+
+    // ── шапка и участники ───────────────────────────────────────────────────
+    function шапка() {
+        document.getElementById('название').textContent = параметры.Наименование || '';
+        var аватар = document.getElementById('аватар-беседы');
+        аватар.textContent = (параметры.Наименование || '?').trim().charAt(0).toUpperCase();
+        blobАдрес(параметры.Аватар, function (адрес) {
+            аватар.textContent = '';
+            аватар.style.backgroundImage = 'url(' + адрес + ')';
+        });
+    }
+
+    // Открытая панель перечитывает состав и «в сети» раз в 10 секунд; закрытая к серверу не ходит
+    var ОПРОС_УЧАСТНИКОВ_МС = 10000;
+    var панельУчастников = document.getElementById('участники');
+    var таймерУчастников = null;
+    function строкаУчастника(у) {
+        var строка = document.createElement('div');
+        строка.className = 'участник' + (у.ВСети ? ' в-сети' : '');
+        строка.setAttribute('data-testid', 'участник');
+        строка.setAttribute('data-id', у.Ид);
+        строка.setAttribute('data-online', у.ВСети ? '1' : '0');
+        var портрет = document.createElement('span');
+        портрет.className = 'портрет';
+        var аватар = document.createElement('img');
+        аватар.className = 'аватар';
+        аватар.alt = '';
+        if (аватары[у.Ид]) аватар.src = аватары[у.Ид];
+        else blobАдрес('/avatars/' + у.Ид, function (адрес) { аватары[у.Ид] = адрес; аватар.src = адрес; });
+        var точка = document.createElement('span');
+        точка.className = 'точка';
+        точка.title = у.ВСети ? 'в сети' : 'не в сети';
+        портрет.appendChild(аватар);
+        портрет.appendChild(точка);
+        var имя = document.createElement('span');
+        имя.className = 'имя-участника';
+        имя.textContent = у.Имя + (у.Ид === я ? ' (вы)' : '');
+        строка.appendChild(портрет);
+        строка.appendChild(имя);
+        var отметка = document.createElement('span');
+        отметка.className = 'отметка';
+        отметка.setAttribute('data-testid', 'состояние-участника');
+        отметка.textContent = [у.Состояние === 'ТолькоЧитает' ? 'только читает' : '', у.ВСети ? 'в сети' : '']
+            .filter(function (ч) { return ч; }).join(', ');
+        строка.appendChild(отметка);
+        return строка;
+    }
+    function загрузитьУчастников() {
+        var список = document.getElementById('список-участников');
+        return запрос('GET', '/members').then(json).then(function (участники) {
+            список.textContent = '';
+            (участники || []).forEach(function (у) { список.appendChild(строкаУчастника(у)); });
+            if (!список.firstChild) список.textContent = 'Участников нет';
+        }).catch(function () { if (!список.firstChild) список.textContent = 'Не удалось загрузить участников'; });
+    }
+    function опросУчастников() {
+        if (устарел() || закрыт || !панельУчастников.classList.contains('виден')) { таймерУчастников = null; return; }
+        загрузитьУчастников().then(function () { таймерУчастников = setTimeout(опросУчастников, ОПРОС_УЧАСТНИКОВ_МС); });
+    }
+    function показатьУчастников() {
+        document.getElementById('список-участников').textContent = 'Загрузка…';
+        панельУчастников.classList.add('виден');
+        if (таймерУчастников) clearTimeout(таймерУчастников);
+        опросУчастников();
+    }
+    function скрытьУчастников() {
+        панельУчастников.classList.remove('виден');
+        if (таймерУчастников) { clearTimeout(таймерУчастников); таймерУчастников = null; }
+    }
+    document.getElementById('кнопка-участники').onclick = function () {
+        if (панельУчастников.classList.contains('виден')) скрытьУчастников(); else показатьУчастников();
+    };
+    document.getElementById('закрыть-участников').onclick = скрытьУчастников;
+
+    шапка();
+    начать();
+})();
+</script>
+</body>
+</html>
