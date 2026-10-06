@@ -25,8 +25,8 @@ def ключ(имя):
     return найдено.group(1).strip()
 
 
-вид = {'Library': 'Library', 'Библиотека': 'Library'}[ключ('ProjectKind')]
-поставщик, имя, версия = ключ('Vendor'), ключ('Name'), ключ('Version')
+вид = {'Библиотека': 'Library'}[ключ('ВидПроекта')]
+поставщик, имя, версия = ключ('Поставщик'), ключ('Имя'), ключ('Версия')
 создана = datetime.now(timezone.utc).strftime('%Y.%m.%d %H:%M:%S')
 манифест = (
     'ManifestVersion: 1.0\n'

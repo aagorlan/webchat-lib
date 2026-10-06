@@ -25,9 +25,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          version="$(sed -n 's/^Version: //p' ВебЧат/Проект.yaml)"
+          version="$(sed -n 's/^Версия: //p' ВебЧат/Проект.yaml)"
           if [ -z "$version" ]; then
-            echo "В ВебЧат/Проект.yaml нет Version"; exit 1
+            echo "В ВебЧат/Проект.yaml нет Версия"; exit 1
           fi
           echo "VERSION=$version" >> "$GITHUB_ENV"
           echo "ARCHIVE=webchat-$version.xlib" >> "$GITHUB_ENV"
