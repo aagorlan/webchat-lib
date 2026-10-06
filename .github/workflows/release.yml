@@ -41,7 +41,7 @@ jobs:
           if gh release view "v${VERSION}" > /dev/null 2>&1; then
             gh release upload "v${VERSION}" "dist/${ARCHIVE}" --clobber
             gh release view "v${VERSION}" --json assets -q '.assets[].name' | grep -vxF "${ARCHIVE}" \
-              | while read -r name; do gh release delete-asset "v${VERSION}" "$name" -y; done
+              | while read -r name; do gh release delete-asset -y -- "v${VERSION}" "$name"; done
             echo "EXISTS=1" >> "$GITHUB_ENV"
           fi
       - name: Опубликовать
