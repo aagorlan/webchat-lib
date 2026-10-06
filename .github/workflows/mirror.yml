@@ -1,0 +1,51 @@
+# Зеркало на GitFlic: main и метки выпусков уходят в репозиторий на gitflic.ru после каждой
+# отправки в main и после процесса «Выпуск» — метку он ставит токеном GitHub, а такие метки
+# другие процессы не запускают. Настройки репозитория GitHub: переменная GITFLIC_REPO — путь проекта
+# (владелец/проект), секреты GITFLIC_LOGIN и GITFLIC_TOKEN — логин и токен доступа GitFlic.
+# Без них процесс пропускается
+name: Зеркало
+
+on:
+  push:
+    branches:
+      - main
+  workflow_run:
+    workflows:
+      - Выпуск
+    types:
+      - completed
+  workflow_dispatch:
+
+concurrency:
+  group: mirror
+  cancel-in-progress: false
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Проверить настройки
+        env:
+          REPO: ${{ vars.GITFLIC_REPO }}
+          LOGIN: ${{ secrets.GITFLIC_LOGIN }}
+          TOKEN: ${{ secrets.GITFLIC_TOKEN }}
+        run: |
+          if [ -z "$REPO" ] || [ -z "$LOGIN" ] || [ -z "$TOKEN" ]; then
+            echo "Зеркало не настроено: нужны GITFLIC_REPO, GITFLIC_LOGIN и GITFLIC_TOKEN"
+            echo "SKIP=1" >> "$GITHUB_ENV"
+          fi
+      - uses: actions/checkout@v4
+        if: env.SKIP != '1'
+        with:
+          fetch-depth: 0
+      - name: Отправить на GitFlic
+        if: env.SKIP != '1'
+        env:
+          REPO: ${{ vars.GITFLIC_REPO }}
+          LOGIN: ${{ secrets.GITFLIC_LOGIN }}
+          TOKEN: ${{ secrets.GITFLIC_TOKEN }}
+        run: |
+          git fetch --tags --force origin
+          remote="https://${LOGIN}:${TOKEN}@gitflic.ru/project/${REPO}.git"
+          git push --force "$remote" refs/remotes/origin/main:refs/heads/main
+          git push --force "$remote" --tags
