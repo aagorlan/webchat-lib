@@ -1,10 +1,15 @@
-# Выпуск: метка v<версия> собирает zip-архив проекта и публикует его на странице Releases
+# Выпуск: новая версия в ВебЧат/Проект.yaml на main — метка v<версия>, zip-архив проекта
+# и выпуск на странице Releases. Версия, у которой выпуск уже есть, пропускается
 name: Выпуск
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches:
+      - main
+    paths:
+      - 'ВебЧат/Проект.yaml'
+      - '.github/workflows/release.yml'
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -14,22 +19,30 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Сверить версию метки с Проект.yaml
+      - name: Прочитать версию
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          version="${GITHUB_REF_NAME#v}"
-          in_project="$(sed -n 's/^Version: //p' ВебЧат/Проект.yaml)"
-          if [ "$version" != "$in_project" ]; then
-            echo "Метка $GITHUB_REF_NAME, а в Проект.yaml версия $in_project"; exit 1
+          version="$(sed -n 's/^Version: //p' ВебЧат/Проект.yaml)"
+          if [ -z "$version" ]; then
+            echo "В ВебЧат/Проект.yaml нет Version"; exit 1
           fi
           echo "VERSION=$version" >> "$GITHUB_ENV"
+          if gh release view "v$version" > /dev/null 2>&1; then
+            echo "Выпуск v$version уже есть"
+            echo "EXISTS=1" >> "$GITHUB_ENV"
+          fi
       - name: Собрать архив
+        if: env.EXISTS != '1'
         run: |
           mkdir -p dist
           (cd ВебЧат && zip -qr "../dist/ВебЧат-${VERSION}.zip" .)
       - name: Опубликовать
+        if: env.EXISTS != '1'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" "dist/ВебЧат-${VERSION}.zip" \
+          gh release create "v${VERSION}" "dist/ВебЧат-${VERSION}.zip" \
+            --target "$GITHUB_SHA" \
             --title "ВебЧат ${VERSION}" \
             --notes "Изменения — в CHANGELOG.md. Загрузка: панель управления → Проекты → + Добавить проект → Загрузить проект из файла."
