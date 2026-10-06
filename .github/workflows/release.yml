@@ -1,5 +1,5 @@
-# Выпуск: новая версия в ВебЧат/Проект.yaml на main — метка v<версия>, zip-архив проекта
-# и выпуск на странице Releases. У готового выпуска архив перезаливается. Имя архива латиницей:
+# Выпуск: новая версия в ВебЧат/Проект.yaml на main — метка v<версия>, сборка .xlib
+# и выпуск на странице Releases. У готового выпуска сборка перезаливается. Имя сборки латиницей:
 # кириллицу из имён файлов выпуска GitHub вырезает
 name: Выпуск
 
@@ -30,11 +30,11 @@ jobs:
             echo "В ВебЧат/Проект.yaml нет Version"; exit 1
           fi
           echo "VERSION=$version" >> "$GITHUB_ENV"
-          echo "ARCHIVE=webchat-$version.zip" >> "$GITHUB_ENV"
-      - name: Собрать архив
+          echo "ARCHIVE=webchat-$version.xlib" >> "$GITHUB_ENV"
+      - name: Собрать сборку
         run: |
-          python3 .github/упаковать.py ВебЧат "dist/${ARCHIVE}"
-      - name: Перезалить архив готового выпуска
+          python3 .github/упаковать.py ВебЧат "dist/${ARCHIVE}" "$GITHUB_SHA"
+      - name: Перезалить сборку готового выпуска
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
