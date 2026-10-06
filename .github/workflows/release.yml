@@ -1,0 +1,35 @@
+# Выпуск: метка v<версия> собирает zip-архив проекта и публикует его на странице Releases
+name: Выпуск
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Сверить версию метки с Проект.yaml
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          in_project="$(sed -n 's/^Version: //p' ВебЧат/Проект.yaml)"
+          if [ "$version" != "$in_project" ]; then
+            echo "Метка $GITHUB_REF_NAME, а в Проект.yaml версия $in_project"; exit 1
+          fi
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+      - name: Собрать архив
+        run: |
+          mkdir -p dist
+          (cd ВебЧат && zip -qr "../dist/ВебЧат-${VERSION}.zip" .)
+      - name: Опубликовать
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" "dist/ВебЧат-${VERSION}.zip" \
+            --title "ВебЧат ${VERSION}" \
+            --notes "Изменения — в CHANGELOG.md. Загрузка: панель управления → Проекты → + Добавить проект → Загрузить проект из файла."
