@@ -13,6 +13,7 @@
 | Пространство имён | `DP::ВебЧат::Основное` |
 | Платформа | 1С:Предприятие.Элемент, режим совместимости 9.0 |
 | Лицензия | [MIT](LICENSE) |
+
 **Автор** — Дмитрий Павлов · [GitFlic](https://gitflic.ru/user/aagorlan) · [GitHub](https://github.com/aagorlan) · [Telegram-канал «ИТ как система. Без героев»](https://t.me/itkaksi)
 
 ## Что умеет
