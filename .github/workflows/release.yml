@@ -10,6 +10,7 @@ on:
     paths:
       - 'ВебЧат/Проект.yaml'
       - '.github/workflows/release.yml'
+      - '.github/упаковать.py'
   workflow_dispatch:
 
 permissions:
@@ -32,8 +33,7 @@ jobs:
           echo "ARCHIVE=webchat-$version.zip" >> "$GITHUB_ENV"
       - name: Собрать архив
         run: |
-          mkdir -p dist
-          (cd ВебЧат && zip -qr "../dist/${ARCHIVE}" .)
+          python3 .github/упаковать.py ВебЧат "dist/${ARCHIVE}"
       - name: Перезалить архив готового выпуска
         env:
           GH_TOKEN: ${{ github.token }}
