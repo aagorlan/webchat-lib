@@ -1,5 +1,6 @@
 # Выпуск: новая версия в ВебЧат/Проект.yaml на main — метка v<версия>, zip-архив проекта
-# и выпуск на странице Releases. Версия, у которой выпуск уже есть, пропускается
+# и выпуск на странице Releases. У готового выпуска архив перезаливается. Имя архива латиницей:
+# кириллицу из имён файлов выпуска GitHub вырезает
 name: Выпуск
 
 on:
@@ -28,21 +29,27 @@ jobs:
             echo "В ВебЧат/Проект.yaml нет Version"; exit 1
           fi
           echo "VERSION=$version" >> "$GITHUB_ENV"
-          if gh release view "v$version" > /dev/null 2>&1; then
-            echo "Выпуск v$version уже есть"
-            echo "EXISTS=1" >> "$GITHUB_ENV"
-          fi
+          echo "ARCHIVE=webchat-$version.zip" >> "$GITHUB_ENV"
       - name: Собрать архив
-        if: env.EXISTS != '1'
         run: |
           mkdir -p dist
-          (cd ВебЧат && zip -qr "../dist/ВебЧат-${VERSION}.zip" .)
+          (cd ВебЧат && zip -qr "../dist/${ARCHIVE}" .)
+      - name: Перезалить архив готового выпуска
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "v${VERSION}" > /dev/null 2>&1; then
+            gh release upload "v${VERSION}" "dist/${ARCHIVE}" --clobber
+            gh release view "v${VERSION}" --json assets -q '.assets[].name' | grep -vxF "${ARCHIVE}" \
+              | while read -r name; do gh release delete-asset "v${VERSION}" "$name" -y; done
+            echo "EXISTS=1" >> "$GITHUB_ENV"
+          fi
       - name: Опубликовать
         if: env.EXISTS != '1'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "v${VERSION}" "dist/ВебЧат-${VERSION}.zip" \
+          gh release create "v${VERSION}" "dist/${ARCHIVE}" \
             --target "$GITHUB_SHA" \
             --title "ВебЧат ${VERSION}" \
             --notes "Изменения — в CHANGELOG.md. Загрузка: панель управления → Проекты → + Добавить проект → Загрузить проект из файла."
