@@ -16,6 +16,8 @@
 
 **Автор** — Дмитрий Павлов · [GitFlic](https://gitflic.ru/user/aagorlan) · [GitHub](https://github.com/aagorlan) · [Telegram-канал «ИТ как система. Без героев»](https://t.me/itkaksi)
 
+Основной репозиторий и сборки `.xlib` — [GitHub](https://github.com/aagorlan/webchat-lib) · зеркало — [GitFlic](https://gitflic.ru/project/aagorlan/webchat-lib). Вопросы и предложения — в issues на GitHub.
+
 ## Что умеет
 
 - сообщения с жирным и курсивом, эмодзи, файлами и изображениями, ответ с цитатой,
