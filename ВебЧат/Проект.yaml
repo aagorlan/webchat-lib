@@ -1,12 +1,12 @@
-Id: 6fadb591-b449-4607-8fb1-d59ee2e15933
-CompatibilityMode: 9.0
-DefaultLanguage: Russian
-DevelopmentLanguage: Russian
-LocalizationLanguages:
-    - Russian
-Name: ВебЧат
-Presentation: Внутренний чат
-ProjectKind: Library
-Vendor: DP
-VendorPresentation: Дмитрий Павлов
-Version: 1.0.0.1
+Ид: 6fadb591-b449-4607-8fb1-d59ee2e15933
+Версия: 1.0.0.2
+ВидПроекта: Библиотека
+Имя: ВебЧат
+Поставщик: DP
+Представление: Внутренний чат
+ПредставлениеПоставщика: Дмитрий Павлов
+РежимСовместимости: 9.0
+ЯзыкПоУмолчанию: Русский
+ЯзыкРазработки: Русский
+ЯзыкиЛокализации:
+    - Русский
