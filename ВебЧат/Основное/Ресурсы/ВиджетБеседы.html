@@ -160,8 +160,10 @@
     var экземпляр = {};
     window.chatInstance = экземпляр;
     function устарел() { return window.chatInstance !== экземпляр; }
+    // Опубликованное приложение живёт под /applications/<имя>, на своём домене — в корне
     var части = window.location.pathname.split('/');
-    var база = window.location.origin + '/' + части[1] + '/' + части[2] + '/api/webchat/' + беседа;
+    var корень = части[1] === 'applications' ? '/applications/' + части[2] : '';
+    var база = window.location.origin + корень + '/api/webchat/' + беседа;
 
     var ОПРОС_МС = 3000, ПАУЗА_МАКС_МС = 30000;
     var РЕАКЦИИ = {
