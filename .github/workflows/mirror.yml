@@ -55,8 +55,11 @@ jobs:
           remote="https://${LOGIN}:${TOKEN}@gitflic.ru/project/${REPO}.git"
           git push --force "$remote" refs/remotes/origin/main:refs/heads/main
           git push --force "$remote" --tags
+      # Создание релиза через API GitFlic отвечает 403 даже токену со всеми правами на проект —
+      # вопрос задан GitFlic; до ответа сбой шага не валит зеркало
       - name: Опубликовать выпуск на GitFlic
         if: env.SKIP != '1'
+        continue-on-error: true
         env:
           REPO: ${{ vars.GITFLIC_REPO }}
           TOKEN: ${{ secrets.GITFLIC_TOKEN }}
@@ -72,8 +75,8 @@ jobs:
             if [ "${code#2}" = "$code" ]; then
               echo "${what}: ответ ${code}"; cat response.json; echo
               if [ "$code" = 403 ]; then
-                echo "Токену GitFlic не хватает прав: нужны «Просмотр информации о проектах пользователя»" \
-                  "и «Редактирование существующих проектов пользователя»"
+                echo "GitFlic отказал в доступе. Токену нужны права project_read и project_edit;" \
+                  "если они есть, отказ — на стороне GitFlic"
               fi
               exit 1
             fi
