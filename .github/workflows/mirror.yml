@@ -63,8 +63,22 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REBUILT: ${{ github.event_name == 'workflow_run' }}
         run: |
-          api="https://api.gitflic.ru/project/${REPO}/release"
+          api="https://api.gitflic.ru/project/${REPO}"
           auth="Authorization: token ${TOKEN}"
+          # Запрос к API GitFlic: ответ — в response.json, при коде не 2xx процесс падает
+          call() {
+            what="$1"; shift
+            code="$(curl -sS -o response.json -w '%{http_code}' -H "$auth" "$@")"
+            if [ "${code#2}" = "$code" ]; then
+              echo "${what}: ответ ${code}"; cat response.json; echo
+              if [ "$code" = 403 ]; then
+                echo "Токену GitFlic не хватает прав: нужны «Просмотр информации о проектах пользователя»" \
+                  "и «Редактирование существующих проектов пользователя»"
+              fi
+              exit 1
+            fi
+          }
+
           git checkout --quiet refs/remotes/origin/main
           version="$(sed -n 's/^Версия: //p' ВебЧат/Проект.yaml)"
           tag="v${version}"
@@ -74,36 +88,35 @@ jobs:
           fi
           gh release download "$tag" --pattern "$archive" --dir dist --clobber
 
-          # Описание — раздел версии из CHANGELOG.md
-          notes="$(awk -v v="## ${version}" '$0 == v { on = 1; next } /^## / { on = 0 } on' CHANGELOG.md)"
-          notes="$(printf '%s\n\nЗагрузка: панель управления → Проекты → + Добавить проект → Загрузить проект из файла.' "$notes" | sed '/./,$!d')"
-
-          code="$(curl -sS -o release.json -w '%{http_code}' -H "$auth" "${api}/${tag}")"
+          # Релиз адресуется по UUID — ищется в списке по метке
+          code="$(curl -sS -o response.json -w '%{http_code}' -H "$auth" "${api}/release?page=0&size=100")"
           if [ "$code" = 404 ]; then
-            jq -n --arg title "ВебЧат ${version}" --arg description "$notes" --arg tagName "$tag" \
-              '{title: $title, description: $description, tagName: $tagName, preRelease: false}' > body.json
-            code="$(curl -sS -o release.json -w '%{http_code}' -X POST -H "$auth" \
-              -H 'Content-Type: application/json' --data @body.json "$api")"
-            if [ "${code#2}" = "$code" ]; then
-              echo "Релиз ${tag} не создан, ответ ${code}:"; cat release.json; exit 1
-            fi
-            echo "Создан релиз ${tag}"
+            echo '[]' > response.json
           elif [ "${code#2}" = "$code" ]; then
-            echo "Релиз ${tag} не прочитан, ответ ${code}:"; cat release.json; exit 1
+            call "Список релизов не прочитан" "${api}/release?page=0&size=100"
           fi
+          jq --arg t "$tag" 'first(.. | objects | select(.tagName? == $t)) // empty' response.json > release.json
+          if [ ! -s release.json ]; then
+            call "Метки ${tag} на GitFlic нет" "${api}/tag/${tag}"
+            notes="$(awk -v v="## ${version}" '$0 == v { on = 1; next } /^## / { on = 0 } on' CHANGELOG.md)"
+            notes="$(printf '%s\n\nЗагрузка: панель управления → Проекты → + Добавить проект → Загрузить проект из файла.' "$notes" | sed '/./,$!d')"
+            jq -n --arg title "ВебЧат ${version}" --arg description "$notes" --arg tagName "$tag" \
+              '{title: $title, description: $description, tagName: $tagName, preRelease: false, attachProjectArchive: false}' > body.json
+            call "Релиз ${tag} не создан" -X POST -H 'Content-Type: application/json' --data @body.json "${api}/release"
+            cp response.json release.json
+            echo "Создан релиз ${tag}"
+          fi
+          id="$(jq -r '.id' release.json)"
 
-          has_file="$(jq -r --arg n "$archive" '[.attachmentFiles[]?.name] | index($n) != null' release.json)"
-          if [ "$has_file" = true ] && [ "$REBUILT" != true ]; then
+          if jq -e --arg n "$archive" 'any(.attachmentFiles[]?; .name == $n)' release.json > /dev/null \
+            && [ "$REBUILT" != true ]; then
             echo "Сборка ${archive} в релизе ${tag} уже есть"; exit 0
           fi
-          # Старые файлы релиза (прежняя сборка той же версии) удаляются перед загрузкой
-          jq -r '.attachmentFiles[]?.name' release.json | while read -r name; do
-            curl -sS -o /dev/null -w "Удалён ${name}: %{http_code}\n" -X DELETE -H "$auth" \
-              "${api}/${tag}/file/$(jq -rn --arg n "$name" '$n | @uri')"
-          done
-          code="$(curl -sS -o upload.json -w '%{http_code}' -X POST -H "$auth" \
-            -F "files=@dist/${archive}" "${api}/${tag}/file")"
-          if [ "${code#2}" = "$code" ]; then
-            echo "Сборка не загружена, ответ ${code}:"; cat upload.json; exit 1
+          # Прежние файлы релиза (старая сборка той же версии) удаляются перед загрузкой
+          jq '[.attachmentFiles[]?.uuid]' release.json > old.json
+          if [ "$(jq length old.json)" != 0 ]; then
+            call "Старые файлы релиза не удалены" -X DELETE -H 'Content-Type: application/json' \
+              --data @old.json "${api}/release/${id}/file"
           fi
+          call "Сборка не загружена" -X POST -F "files=@dist/${archive}" "${api}/release/${id}/file"
           echo "Сборка ${archive} загружена в релиз ${tag}"
