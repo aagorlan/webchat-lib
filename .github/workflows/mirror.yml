@@ -1,8 +1,11 @@
 # Зеркало на GitFlic: main и метки выпусков уходят в репозиторий на gitflic.ru после каждой
 # отправки в main и после процесса «Выпуск» — метку он ставит токеном GitHub, а такие метки
 # другие процессы не запускают. Настройки репозитория GitHub: переменная GITFLIC_REPO — путь проекта
-# (владелец/проект), секреты GITFLIC_LOGIN и GITFLIC_TOKEN — логин и токен доступа GitFlic.
-# Без них процесс пропускается
+# (владелец/проект), секреты GITFLIC_LOGIN и GITFLIC_TOKEN — логин и токен доступа GitFlic
+# (токену нужны права на запись в репозиторий и на релизы). Без них процесс пропускается.
+# Затем выпуск текущей версии публикуется и на GitFlic: релиз на метке v<версия> со сборкой
+# .xlib, взятой из выпуска на GitHub, и описанием из CHANGELOG.md. После процесса «Выпуск»
+# сборка релиза на GitFlic перезаливается, как и на GitHub
 name: Зеркало
 
 on:
@@ -15,6 +18,9 @@ on:
     types:
       - completed
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 concurrency:
   group: mirror
@@ -49,3 +55,55 @@ jobs:
           remote="https://${LOGIN}:${TOKEN}@gitflic.ru/project/${REPO}.git"
           git push --force "$remote" refs/remotes/origin/main:refs/heads/main
           git push --force "$remote" --tags
+      - name: Опубликовать выпуск на GitFlic
+        if: env.SKIP != '1'
+        env:
+          REPO: ${{ vars.GITFLIC_REPO }}
+          TOKEN: ${{ secrets.GITFLIC_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+          REBUILT: ${{ github.event_name == 'workflow_run' }}
+        run: |
+          api="https://api.gitflic.ru/project/${REPO}/release"
+          auth="Authorization: token ${TOKEN}"
+          git checkout --quiet refs/remotes/origin/main
+          version="$(sed -n 's/^Версия: //p' ВебЧат/Проект.yaml)"
+          tag="v${version}"
+          archive="webchat-${version}.xlib"
+          if ! gh release view "$tag" > /dev/null 2>&1; then
+            echo "На GitHub нет выпуска ${tag} — на GitFlic публиковать нечего"; exit 0
+          fi
+          gh release download "$tag" --pattern "$archive" --dir dist --clobber
+
+          # Описание — раздел версии из CHANGELOG.md
+          notes="$(awk -v v="## ${version}" '$0 == v { on = 1; next } /^## / { on = 0 } on' CHANGELOG.md)"
+          notes="$(printf '%s\n\nЗагрузка: панель управления → Проекты → + Добавить проект → Загрузить проект из файла.' "$notes" | sed '/./,$!d')"
+
+          code="$(curl -sS -o release.json -w '%{http_code}' -H "$auth" "${api}/${tag}")"
+          if [ "$code" = 404 ]; then
+            jq -n --arg title "ВебЧат ${version}" --arg description "$notes" --arg tagName "$tag" \
+              '{title: $title, description: $description, tagName: $tagName, preRelease: false}' > body.json
+            code="$(curl -sS -o release.json -w '%{http_code}' -X POST -H "$auth" \
+              -H 'Content-Type: application/json' --data @body.json "$api")"
+            if [ "${code#2}" = "$code" ]; then
+              echo "Релиз ${tag} не создан, ответ ${code}:"; cat release.json; exit 1
+            fi
+            echo "Создан релиз ${tag}"
+          elif [ "${code#2}" = "$code" ]; then
+            echo "Релиз ${tag} не прочитан, ответ ${code}:"; cat release.json; exit 1
+          fi
+
+          has_file="$(jq -r --arg n "$archive" '[.attachmentFiles[]?.name] | index($n) != null' release.json)"
+          if [ "$has_file" = true ] && [ "$REBUILT" != true ]; then
+            echo "Сборка ${archive} в релизе ${tag} уже есть"; exit 0
+          fi
+          # Старые файлы релиза (прежняя сборка той же версии) удаляются перед загрузкой
+          jq -r '.attachmentFiles[]?.name' release.json | while read -r name; do
+            curl -sS -o /dev/null -w "Удалён ${name}: %{http_code}\n" -X DELETE -H "$auth" \
+              "${api}/${tag}/file/$(jq -rn --arg n "$name" '$n | @uri')"
+          done
+          code="$(curl -sS -o upload.json -w '%{http_code}' -X POST -H "$auth" \
+            -F "files=@dist/${archive}" "${api}/${tag}/file")"
+          if [ "${code#2}" = "$code" ]; then
+            echo "Сборка не загружена, ответ ${code}:"; cat upload.json; exit 1
+          fi
+          echo "Сборка ${archive} загружена в релиз ${tag}"
