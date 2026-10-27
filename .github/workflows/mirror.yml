@@ -97,7 +97,17 @@ jobs:
           fi
           jq --arg t "$tag" 'first(.. | objects | select(.tagName? == $t)) // empty' response.json > release.json
           if [ ! -s release.json ]; then
-            call "Метки ${tag} на GitFlic нет" "${api}/tag/${tag}"
+            # Диагностика: дошла ли метка до GitFlic (на ход публикации не влияет)
+            code="$(curl -sS -o tags.json -w '%{http_code}' -H "$auth" "${api}/tag?page=0&size=100")"
+            if [ "${code#2}" != "$code" ]; then
+              if jq -e --arg t "$tag" 'any(.. | strings; . == $t)' tags.json > /dev/null; then
+                echo "Метка ${tag} на GitFlic есть"
+              else
+                echo "Метки ${tag} в списке меток GitFlic нет:"; jq -c '[.. | objects | .name? // empty]' tags.json
+              fi
+            else
+              echo "Список меток GitFlic не прочитан, ответ ${code}:"; cat tags.json; echo
+            fi
             notes="$(awk -v v="## ${version}" '$0 == v { on = 1; next } /^## / { on = 0 } on' CHANGELOG.md)"
             notes="$(printf '%s\n\nЗагрузка: панель управления → Проекты → + Добавить проект → Загрузить проект из файла.' "$notes" | sed '/./,$!d')"
             jq -n --arg title "ВебЧат ${version}" --arg description "$notes" --arg tagName "$tag" \
