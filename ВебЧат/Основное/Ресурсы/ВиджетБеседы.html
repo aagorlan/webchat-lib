@@ -853,7 +853,9 @@
         панельУчастников.classList.remove('виден');
         if (таймерУчастников) { clearTimeout(таймерУчастников); таймерУчастников = null; }
     }
-    document.getElementById('кнопка-участники').onclick = function () {
+    var кнопкаУчастники = document.getElementById('кнопка-участники');
+    кнопкаУчастники.hidden = параметры.СкрытьСостав;
+    кнопкаУчастники.onclick = function () {
         if (панельУчастников.classList.contains('виден')) скрытьУчастников(); else показатьУчастников();
     };
     document.getElementById('закрыть-участников').onclick = скрытьУчастников;
